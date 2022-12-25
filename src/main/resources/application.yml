@@ -1,0 +1,5 @@
+spring:
+  codec:
+    max-in-memory-size: 5MB
+  thymeleaf:
+    prefix: "classpath:/should-be-in-another-war-file/"
