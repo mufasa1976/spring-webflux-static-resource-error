@@ -1,5 +1,6 @@
 package io.github.mufasa1976.spring.webflux.static_resource_with_error;
 
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -104,11 +105,11 @@ class StaticResourceWithErrorApplicationTests {
        .expectBody().consumeWith(response -> assertThat(response.getResponseBody())
            .asString()
            .isNotEmpty()
-           .isEqualTo(getContent("en/main.6187e65880c98290.js")));
+           .isEqualTo(getContent("/en/main.6187e65880c98290.js")));
   }
 
   private String getContent(String location) {
-    final var resource = resourceLoader.getResource(String.join("/", thymeleafPrefix, location));
+    final var resource = resourceLoader.getResource(String.join("/", thymeleafPrefix, StringUtils.stripStart(location, "/")));
     if (!resource.exists() || !resource.isFile() || !resource.isReadable()) {
       return null;
     }
@@ -130,7 +131,7 @@ class StaticResourceWithErrorApplicationTests {
        .expectBody().consumeWith(response -> assertThat(response.getResponseBody())
            .asString()
            .isNotEmpty()
-           .isEqualTo(getContent("en/favicon.ico")));
+           .isEqualTo(getContent("/en/favicon.ico")));
   }
 
   @Test
@@ -143,6 +144,6 @@ class StaticResourceWithErrorApplicationTests {
        .expectBody().consumeWith(response -> assertThat(response.getResponseBody())
            .asString()
            .isNotEmpty()
-           .isEqualTo(getContent("en/assets/themes.json")));
+           .isEqualTo(getContent("/en/assets/themes.json")));
   }
 }
