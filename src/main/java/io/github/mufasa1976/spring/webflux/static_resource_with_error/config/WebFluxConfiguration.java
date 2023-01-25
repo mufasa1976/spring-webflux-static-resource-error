@@ -1,6 +1,5 @@
 package io.github.mufasa1976.spring.webflux.static_resource_with_error.config;
 
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties;
 import org.springframework.context.annotation.Bean;
@@ -10,14 +9,11 @@ import org.springframework.web.reactive.config.EnableWebFlux;
 import org.springframework.web.reactive.config.ResourceHandlerRegistry;
 import org.springframework.web.reactive.config.ViewResolverRegistry;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
-import org.springframework.web.reactive.function.server.*;
+import org.springframework.web.reactive.function.server.RequestPredicate;
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.ServerResponse;
 import org.thymeleaf.spring6.view.reactive.ThymeleafReactiveViewResolver;
-import reactor.core.publisher.Mono;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
@@ -38,9 +34,6 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
       "/purple-green.css",
       "/3rdpartylicenses.txt"
   };
-  private static final List<Locale> SUPPORTED_LANGUAGES = List.of(Locale.GERMAN, Locale.ENGLISH);
-  private static final Locale DEFAULT_LANGUAGE = Locale.ENGLISH;
-
   private final String prefix;
   private final ThymeleafReactiveViewResolver thymeleafReactiveViewResolver;
 
@@ -51,32 +44,11 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
 
   @Override
   public void addResourceHandlers(ResourceHandlerRegistry registry) {
-    registry.setOrder(1);
     registry.addResourceHandler("/webjars/**")
             .addResourceLocations("classpath:/META-INF/resources/webjars/")
             .resourceChain(true);
-    SUPPORTED_LANGUAGES.forEach(addLocalizedAngularResourcesTo(registry));
-  }
-
-  private Consumer<Locale> addLocalizedAngularResourcesTo(ResourceHandlerRegistry registry) {
-    return language -> {
-      final var relativeAngularResources = Stream.of(ANGULAR_RESOURCES)
-                                                 .filter(resource -> StringUtils.contains(resource, "*"))
-                                                 .map(resource -> "/" + language.getLanguage() + resource)
-                                                 .toArray(String[]::new);
-      registry.addResourceHandler(relativeAngularResources)
-              .addResourceLocations(prefix + language.getLanguage() + "/");
-
-      final var fixedAngularResources = Stream.of(ANGULAR_RESOURCES)
-                                              .filter(resource -> !StringUtils.contains(resource, "*"))
-                                              .map(resource -> "/" + language.getLanguage() + resource)
-                                              .toArray(String[]::new);
-      registry.addResourceHandler(fixedAngularResources)
-              .addResourceLocations(prefix);
-
-      registry.addResourceHandler("/" + language.getLanguage() + "/assets/**")
-              .addResourceLocations(prefix + language.getLanguage() + "/assets/");
-    };
+    registry.addResourceHandler("/**")
+            .addResourceLocations(prefix);
   }
 
   @Override
@@ -86,24 +58,12 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
 
   @Bean
   public RouterFunction<ServerResponse> routerFunction() {
-    final var routerFunctionBuilder = route().GET("/", this::defaultLandingPage);
-    SUPPORTED_LANGUAGES.forEach(addLocalizedLandingPageTo(routerFunctionBuilder));
-    return routerFunctionBuilder.build();
-  }
-
-  private Mono<ServerResponse> defaultLandingPage(ServerRequest request) {
-    final var locale = Optional.ofNullable(Locale.lookup(request.headers().acceptLanguage(), SUPPORTED_LANGUAGES))
-                               .orElse(DEFAULT_LANGUAGE);
-    return ServerResponse.temporaryRedirect(request.uriBuilder().path(locale.getLanguage()).build()).build();
-  }
-
-  private Consumer<Locale> addLocalizedLandingPageTo(RouterFunctions.Builder routerFunctionBuilder) {
-    return language -> {
-      var requestPredicate = Stream.of(ANGULAR_RESOURCES)
-                                   .map(angularResource -> "/" + language.getLanguage() + angularResource)
-                                   .reduce(GET("/" + language.getLanguage() + "/**"), (requestPredicte, route) -> requestPredicte.and(GET(route).negate()), RequestPredicate::and);
-      requestPredicate = requestPredicate.and(GET("/" + language.getLanguage() + "/assets/**").negate());
-      routerFunctionBuilder.route(requestPredicate, request -> ServerResponse.ok().contentType(MediaType.TEXT_HTML).render(language.getLanguage() + "/index"));
-    };
+    final var requestPredicate = Stream.concat(
+        Stream.of(ANGULAR_RESOURCES),
+        Stream.of("/assets/**", "/api/**", "/webjars/**")
+    ).reduce(GET("/**"), (predicate, route) -> predicate.and(GET(route).negate()), RequestPredicate::and);
+    return route(requestPredicate, request -> ServerResponse.ok()
+                                                            .contentType(MediaType.TEXT_HTML)
+                                                            .render("index"));
   }
 }
